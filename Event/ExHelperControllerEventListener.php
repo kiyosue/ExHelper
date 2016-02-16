@@ -11,14 +11,14 @@ class ExHelperControllerEventListener extends BcControllerEventListener {
 
 	// 登録先イベントの定義
 	public $events = array(
-		'Blog.Blog.beforeRender',
+		'beforeRender',
 	);
 
 	/**
 	 * 拡張BlogHelperを呼び出しに追加
 	 *
 	 */
-	public function blogBlogBeforeRender(CakeEvent $event) {
+	public function beforeRender(CakeEvent $event) {
 		$path = App::pluginPath('ExHelper');
 
 		// ヘルパーのパスを追加
