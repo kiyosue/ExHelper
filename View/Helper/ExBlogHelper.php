@@ -22,7 +22,7 @@ class ExBlogHelper extends BlogHelper {
 
 	var $allBlogPagination = null;
 
-	public $helpers = array('Html', 'BcTime', 'BcBaser', 'BcUpload', 'BcBaser');
+	public $helpers = array('Html', 'BcTime', 'BcBaser', 'BcUpload', 'BcBaser', 'Paginator');
 
 	/**
 	 * コンストラクタ
@@ -146,25 +146,25 @@ class ExBlogHelper extends BlogHelper {
 			'cache' => false //キャッシュはオフに
 		));
 
+
+		$ExHelperController = new ExHelperController($this->createDummyRequest());
+		//依存しているModel、Componentの読込
+		$ExHelperController->constructClasses();
+
 		//pagination用セッティング
-		$settings =  array(
+		$ExHelperController->Paginator->settings = array(
 			'page' => 1,
 			'limit' => 2,
 			'maxLimit' => 100,
 			'paramType' => 'querystring'
 		);
 
-		$ExHelperController = new ExHelperController();
-//		var_dump($this->request);exit;
-		$ExHelperController->request = $this->request; //pagination componentで使っているため
-		$ExHelperController->request->params['controller'] = substr($this->BcBaser->getUrl(),1);
-		$ExHelperController->request->params['action'] = null;
+		$posts = $ExHelperController->Paginator->paginate('BlogPost', $conditions);
 
-		$ComponentCollection = new ComponentCollection();
-		$ComponentCollection->init($ExHelperController); //利用するControllerをセットしてあげる。
-		$this->Paginator = new PaginatorComponent($ComponentCollection, $settings);
-
-		$posts = $this->Paginator->paginate('BlogPost', $conditions);
+		//ページネーションの出力に使うPaginatorHelper::$requestをダミーのCakeRequestに一旦差し替え
+ 		$this->Paginator->request = $ExHelperController->request;
+		//ルータの中身も差し替え
+		Router::setRequestInfo($ExHelperController->request);
 
 		// 出力関数しかないので一回制御
 		ob_start();
@@ -172,8 +172,42 @@ class ExBlogHelper extends BlogHelper {
 		$this->allBlogPagination = ob_get_contents();
 		ob_end_clean();
 
-		return $posts ;
+		//CakeRequestを元に戻す
+		$this->Paginator->request = $this->request;
+		Router::popRequest();
+
+		return $posts;
 	}
+
+	/**
+	 * 基準となるURLを上手く出力できるようなダミーのリクエストを作成
+	 * 固定ページのリバースルーティングが現状できないので小細工
+	 * @return CakeRequest
+	 */
+	protected function createDummyRequest()
+	{
+		$request = new CakeRequest($this->request->url);
+		$url = substr($this->BcBaser->getUrl(), 1);
+		$urlSplit = explode('/', $url);
+		switch(count($urlSplit)) {
+			case 0:
+				$request['controller'] = null;
+				$request['action'] = null;
+				break;
+			case 1:
+				$request['controller'] = $urlSplit[0];
+				$request['action'] = null;
+				break;
+			default:
+				$request['controller'] = $urlSplit[0];
+				$request['action'] = $urlSplit[1];
+				$request['pass'] = array_slice($urlSplit, 2);
+				break;
+		}
+
+		return $request;
+	}
+
 
 	/**
 	 * 直前に実行された allBlogPosts のpaginationを出力
